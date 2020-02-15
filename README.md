@@ -28,7 +28,7 @@ New-HomeAssistantSession neds to be used before any other function will work.
 
 ```powershell
   
-New-HomeAssistantSession -Hostname hass.domain.com -Port 8123 -Token eyYfo49g036gdKg5LSki4w04tkifulaglgkMn3idnf2w57x5eyfog036gdKg5LSkgw04tkifulaglgkMidnf2w57axyYfo49g036gdKLSkgi4w04tkifaglgkMn3idnf2w57axyYfo49g036gdKg5LSkgi4w04tkifulaglgkMn3idnf2w57ax5 -UseSSL
+New-HomeAssistantSession -Hostname hass.domain.com -UseSSL -Port 8123 -Token eyYfo49g036gdKg5LSki4w04tkifulaglgkMn3idnf2w57x5eyfog036gdKg5LSkgw04tkifulaglgkMidnf2w57axyYfo49g036gdKLSkgi4w04tkifaglgkMn3idnf2w57axyYfo49g036gdKg5LSkgi4w04tkifulaglgkMn3idnf2w57ax5
 Get-HomeAssistantEntity -entity_id light.limitlessled_g1
 Invoke-HomeAssistantService -service light.turn_on -entity_id light.limitlessled_g1
 Invoke-HomeAssistantService -service light.turn_on -json '{"entity_id":"light.limitlessled_g1","color_name":"blue"}'
