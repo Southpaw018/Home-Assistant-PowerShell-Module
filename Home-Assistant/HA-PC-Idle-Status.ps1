@@ -1,15 +1,18 @@
+[CmdletBinding()]
+Param()
+
 # Create default configuration
 if(-Not (Test-Path -Path $PSScriptRoot\Config.xml)) 
 {
   # Create the configuration object
   $ConfigObject = @{
-    Service  = 'input_boolean.toggle'
-    Entity   = 'input_boolean.idle'
-    HostName = 'hass.mydomain.com'
-    Port     = '8123'
-    IdleSeconds = '10'
-    CheckInterval = '5'
-    Token    = ''
+    Service       = 'input_boolean.toggle'
+    Entity        = 'input_boolean.idle'
+    HostName      = 'hass.mydomain.com'
+    Port          = '8123'
+    IdleSeconds   = '5'
+    CheckInterval = '1'
+    Token         = ''
   }
 
   # Export the object to XML
@@ -18,12 +21,13 @@ if(-Not (Test-Path -Path $PSScriptRoot\Config.xml))
 }
 
 # Test if config file exists and import it
-if(Test-Path -Path "$PSScriptRoot\Config.xml") {
-  
+if(Test-Path -Path "$PSScriptRoot\Config.xml") 
+{
   # Import Configuration
   $config = Import-Clixml -Path "$PSScriptRoot\Config.xml"
-} else {
-
+}
+else 
+{
   Write-Error -Message "Configuration file $PSScriptRoot\Config.xml not found"
   break
 }
@@ -31,6 +35,9 @@ if(Test-Path -Path "$PSScriptRoot\Config.xml") {
 
 Function Get-AudioPlaying 
 {
+  [CmdletBinding()]
+  Param()
+
   Add-Type -TypeDefinition @'
 using System;
 using System.Runtime.InteropServices;
@@ -108,6 +115,9 @@ namespace Foo
 
 Function Get-IdleTime 
 {
+  [CmdletBinding()]
+  Param()
+  
   Add-Type -TypeDefinition @'
 using System;
 using System.Diagnostics;
@@ -155,10 +165,17 @@ namespace PInvoke.Win32 {
   $Idle = [PInvoke.Win32.UserInput]::IdleTime
 
   $obj = [PSCustomObject]@{
-    Days    = $Idle.Days
-    Hours   = $Idle.Hours
-    Minutes = $Idle.Minutes
-    Seconds = $Idle.Seconds
+    Days              = $Idle.Days
+    Hours             = $Idle.Hours
+    Minutes           = $Idle.Minutes
+    Seconds           = $Idle.Seconds
+    Milliseconds      = $Idle.Days
+    Ticks             = $Idle.Ticks
+    TotalDays         = $Idle.TotalDays
+    TotalHours        = $Idle.TotalHours
+    TotalMinutes      = $Idle.TotalMinutes
+    TotalSeconds      = $Idle.TotalSeconds
+    TotalMilliseconds = $Idle.TotalMilliseconds
   }
 
   Write-Output -InputObject $obj
@@ -175,7 +192,10 @@ Function Update-HomeAssistantEntity
   )
 
   # Import the home assistant module
-  Import-Module -Name $PSScriptRoot\Home-Assistant.psd1 -Force
+  if(-Not (Get-Module -Name 'Home-Assistant' -ErrorAction SilentlyContinue)) 
+  {
+    Import-Module -Name $PSScriptRoot\Home-Assistant.psd1 -Force
+  }
 
   # Check if an existing session exists else create it
   if(-Not ($ha_api_configured)) 
@@ -184,14 +204,18 @@ Function Update-HomeAssistantEntity
   }
 
   # Get the entity current state
-  $CurrentState = (Get-HomeAssistantEntity -entity_id $config.Entity).state
+  if($global:CurrentState -eq $null) 
+  {
+    $global:CurrentState = (Get-HomeAssistantEntity -entity_id $config.Entity).state
+  }
 
   #If we are set setting the entitiy to 'off' check that it is actually not equal to off first
   if($State -eq 'off') 
   {
     if($CurrentState -ne 'off') 
     {
-      $null = Invoke-HomeAssistantService -service $config.Service -entity_id $config.Entity
+      $null = Invoke-HomeAssistantService -service input_boolean.turn_off -entity_id $config.Entity
+      $global:CurrentState = (Get-HomeAssistantEntity -entity_id $config.Entity).state
     }
   }
 
@@ -200,27 +224,37 @@ Function Update-HomeAssistantEntity
   {
     if($CurrentState -ne 'on') 
     {
-      $null = Invoke-HomeAssistantService -service $config.Service -entity_id $config.Entity
+      $null = Invoke-HomeAssistantService -service input_boolean.turn_on -entity_id $config.Entity
+      $global:CurrentState = (Get-HomeAssistantEntity -entity_id $config.Entity).state
     }
   }
 
   # Output the current status
-  $obj = (Get-HomeAssistantEntity -entity_id $config.Entity).state
-
-  Write-Output -InputObject "Service: $($config.Service) - Entity: $($config.Entity) - State: $($obj)"
+  # $obj = (Get-HomeAssistantEntity -entity_id $config.Entity).state
 }
 
 # Loop the audio playing and idle status and then update the entity accordingly
 while($true)
 {
-  if((Get-IdleTime).Seconds -gt $config.IdleSeconds -and (Get-AudioPlaying) -eq $false) 
+  $IdleTime = (Get-IdleTime).TotalSeconds
+  $AudioPlaying = Get-AudioPlaying
+  
+  Write-Verbose -Message "IdleTime: $IdleTime"
+  Write-Verbose -Message "AudioPlaying: $AudioPlaying"
+  
+  if($IdleTime -gt $config.IdleSeconds) 
   {
-    Update-HomeAssistantEntity -State on
+    If($AudioPlaying -eq $false) 
+    {
+      Update-HomeAssistantEntity -State on
+    }
   }
-  else 
+  
+  if($IdleTime -lt $config.IdleSeconds) 
   {
     Update-HomeAssistantEntity -State off
   }
+
 
   Start-Sleep -Seconds $config.CheckInterval
 }
