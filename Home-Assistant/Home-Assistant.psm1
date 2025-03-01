@@ -16,24 +16,31 @@
 Function New-HomeAssistantSession
 {
     Param(
-    [Parameter(Mandatory=$true)][string]$ip,
-    [Parameter(Mandatory=$true)][string]$port,
-    [Parameter(Mandatory=$true)][string]$token
+    [Parameter(Mandatory=$true)][string]$Hostname,
+    [Parameter(Mandatory=$true)][string]$Port,
+    [Parameter(Mandatory=$true)][string]$Token,
+    [Switch]$UseSSL
     )
 
-    $global:ha_api_headers = @{Authorization = "Bearer "+$token}
-    $global:ha_api_url = "http://"+"$ip"+":"+"$port"+"/api/"
+    $global:ha_api_headers = @{Authorization = "Bearer "+$Token}
+    
+    if($UseSSL.IsPresent) {
+        $global:ha_api_url = "https://"+"$Hostname"+":"+"$Port"+"/api/"
+    } else {
+        $global:ha_api_url = "http://"+"$Hostname"+":"+"$Port"+"/api/"
+    }
 
     try
     {
-        Write-Host "Testing connection... " -ForegroundColor Yellow -NoNewline
-        $api_connection = (Invoke-WebRequest -uri $ha_api_url -Method GET -Headers $ha_api_headers)    
+        Write-Host "Testing connection... $global:ha_api_url " -ForegroundColor Yellow -NoNewline
+        $api_connection = (Invoke-WebRequest -uri $ha_api_url -Method GET -Headers $ha_api_headers -UseBasicParsing)    
         $global:ha_api_configured = $true
         Write-Host "Connection to Home-Assistant API succeeded! (" ($api_connection).StatusCode ($api_connection).StatusDescription ")" -ForegroundColor Green
     }
     catch 
     {
-        if ((Test-NetConnection -ComputerName $ip -WarningAction SilentlyContinue).PingSucceeded)
+
+        if ((Test-NetConnection -ComputerName $Hostname -WarningAction SilentlyContinue).PingSucceeded)
         {
             Write-Host "Connection to Home-Assistant API failed!" -ForegroundColor Red
         }
